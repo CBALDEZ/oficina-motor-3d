@@ -1,0 +1,782 @@
+<!DOCTYPE1 html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor Elétrico Trifásico 4.0 - Vista Explodida RA</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117;
+            color: #e6edf3;
+            overflow: hidden;
+        }
+
+        .font-tech {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* AR Grid effect background */
+        .ar-grid {
+            background-image: linear-gradient(to right, rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        /* Glassmorphism styling */
+        .glass-panel {
+            background: rgba(22, 27, 34, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Pulse glowing border */
+        .glow-cyan {
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.35);
+        }
+
+        .glow-amber {
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.35);
+        }
+
+        /* Custom 3D Overlay Labels */
+        .annotation-label {
+            position: absolute;
+            transform: translate(-50%, -100%);
+            pointer-events: auto;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .annotation-label.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .annotation-label:hover {
+            transform: translate(-50%, -110%) scale(1.08);
+        }
+
+        /* Canvas full container */
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 229, 255, 0.4);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="ar-grid h-screen w-screen select-none">
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay Layer -->
+    <div class="relative z-10 flex flex-col justify-between h-full p-4 md:p-6 pointer-events-none">
+        
+        <!-- Header Panel -->
+        <header class="flex justify-between items-start">
+            <div class="glass-panel p-4 rounded-2xl max-w-md pointer-events-auto border-l-4 border-cyan-500">
+                <div class="flex items-center space-x-2 text-cyan-400 text-xs font-tech tracking-widest uppercase mb-1">
+                    <span class="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                    <span>Realidade Aumentada - WebAR</span>
+                </div>
+                <h1 class="text-xl md:text-2xl font-bold font-tech text-white tracking-wide">MOTOR TRIFÁSICO 4.0</h1>
+                <p class="text-xs text-gray-300 mt-1">
+                    Visão explodida interativa e diagnóstico de componentes para Manutenção Industrial.
+                </p>
+            </div>
+
+            <!-- Quick Stats Badge -->
+            <div class="hidden sm:flex glass-panel px-4 py-2 rounded-xl pointer-events-auto items-center space-x-3 text-xs font-tech">
+                <div class="text-right">
+                    <span class="block text-gray-400 text-[10px]">TENSÃO / POTÊNCIA</span>
+                    <span class="text-cyan-400 font-bold">380V / 15 CV</span>
+                </div>
+                <div class="h-6 w-px bg-gray-700"></div>
+                <div class="text-right">
+                    <span class="block text-gray-400 text-[10px]">ROTAÇÃO</span>
+                    <span class="text-amber-400 font-bold">1750 RPM</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dynamic 2D/3D Floating Annotation Container -->
+        <div id="annotations-container" class="absolute inset-0 pointer-events-none z-20"></div>
+
+        <!-- Info Sidebar (Component Details) -->
+        <aside id="info-card" class="glass-panel fixed top-20 right-6 w-80 md:w-96 rounded-2xl p-5 pointer-events-auto transition-all duration-500 opacity-0 translate-x-10 pointer-events-none z-30 border-t-2 border-cyan-400 shadow-2xl">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-gray-700/60">
+                <div class="flex items-center space-x-2">
+                    <i id="info-icon" data-lucide="cpu" class="w-5 h-5 text-cyan-400"></i>
+                    <h3 id="info-title" class="font-tech text-lg font-bold text-white">Componente</h3>
+                </div>
+                <button id="close-info" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800/60 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p id="info-desc" class="text-xs text-gray-300 leading-relaxed mb-4">
+                Clique em um dos componentes explodidos para visualizar seus detalhes técnicos e aplicação na manutenção.
+            </p>
+            
+            <div class="space-y-2 bg-gray-900/60 p-3 rounded-xl border border-gray-800">
+                <div class="flex justify-between text-xs">
+                    <span class="text-gray-400">Função Principal:</span>
+                    <span id="info-function" class="text-cyan-300 font-medium">--</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-gray-400">Modo de Falha Comum:</span>
+                    <span id="info-fault" class="text-amber-400 font-medium">--</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-gray-400">Preditiva 4.0:</span>
+                    <span id="info-sensor" class="text-emerald-400 font-medium">--</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Bottom Controls Bar -->
+        <footer class="flex flex-col sm:flex-row items-center justify-between gap-4 pointer-events-auto pb-2">
+            
+            <!-- Explode / Play Main Trigger Button -->
+            <button id="btn-explode" class="group relative flex items-center space-x-3 px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-tech font-bold rounded-2xl shadow-lg glow-cyan transition-all duration-300 active:scale-95">
+                <i id="btn-icon" data-lucide="play" class="w-6 h-6 fill-current"></i>
+                <span id="btn-text" class="tracking-wider text-sm">EXPLODIR MOTOR (PLAY)</span>
+            </button>
+
+            <!-- Interactive Helpers & View Controls -->
+            <div class="flex items-center space-x-2 glass-panel p-2 rounded-2xl text-xs">
+                <button id="btn-reset" class="flex items-center space-x-1.5 px-3 py-2 rounded-xl hover:bg-gray-800/80 text-gray-300 hover:text-white transition" title="Resetar Câmera">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4 text-cyan-400"></i>
+                    <span class="hidden md:inline">Resetar Vista</span>
+                </button>
+                <div class="h-4 w-px bg-gray-700"></div>
+                <button id="btn-toggle-labels" class="flex items-center space-x-1.5 px-3 py-2 rounded-xl hover:bg-gray-800/80 text-gray-300 hover:text-white transition" title="Ocultar/Mostrar Nomes">
+                    <i data-lucide="tag" class="w-4 h-4 text-amber-400"></i>
+                    <span class="hidden md:inline">Etiquetas</span>
+                </button>
+                <div class="h-4 w-px bg-gray-700"></div>
+                <div class="px-3 py-1 text-gray-400 text-[11px] flex items-center space-x-1">
+                    <i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    <span>Arraste para girar | Scroll para Zoom</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // --- COMPONENT DATA DATABASE ---
+        const MOTOR_PARTS = [
+            {
+                id: 'fan_cover',
+                name: 'Capa Defletora da Ventoinha',
+                icon: 'box',
+                explodeOffset: { x: 0, y: 0, z: 5.8 },
+                desc: 'Capa metálica estamparia que protege e direciona o ar de refrigeração forçada sobre as aletas da carcaça.',
+                func: 'Proteção mecânica e direcionamento de fluxo de ar',
+                fault: 'Amassamentos por impacto, obstrução por resíduos',
+                sensor: 'Inspeção visual periódica'
+            },
+            {
+                id: 'fan',
+                name: 'Ventoinha de Refrigeração',
+                icon: 'fan',
+                explodeOffset: { x: 0, y: 0, z: 4.6 },
+                desc: 'Hélice com pás radiais fabricada em polímero/alumínio acoplada ao eixo traseiro.',
+                func: 'Troca térmica por convecção forçada',
+                fault: 'Quebra de pás, desequilíbrio e ruído aerodinâmico',
+                sensor: 'Análise de ruído acústico e fluxo de ar'
+            },
+            {
+                id: 'cover_rear',
+                name: 'Tampa Traseira (Escudo)',
+                icon: 'disc',
+                explodeOffset: { x: 0, y: 0, z: 3.4 },
+                desc: 'Tampa fundida traseira responsável pelo alojamento do rolamento traseiro e fechamento da carcaça.',
+                func: 'Suporte do rolamento NDE e alinhamento do eixo',
+                fault: 'Desgaste no alojamento do rolamento, trincas nos pontos de fixação',
+                sensor: 'Sensor de vibração no mancal traseiro'
+            },
+            {
+                id: 'bearing_rear',
+                name: 'Rolamento Traseiro (Esferas)',
+                icon: 'circle-dot',
+                explodeOffset: { x: 0, y: 0, z: 2.2 },
+                desc: 'Rolamento blindado de esferas localizado no lado oposto ao acoplamento (NDE).',
+                func: 'Redução de atrito e suporte radial do rotor',
+                fault: 'Pitting nas pistas, degradação da graxa lubrificante',
+                sensor: 'Análise de Envelope de Vibração e Ultrassom'
+            },
+            {
+                id: 'casing',
+                name: 'Carcaça Aletada e Estator',
+                icon: 'cpu',
+                explodeOffset: { x: 0, y: 0, z: 0 },
+                desc: 'Carcaça em ferro fundido com aletas de refrigeração e pacote estatórico com enrolamentos de cobre impregnados.',
+                func: 'Estrutura principal e indução de campo magnético girante',
+                fault: 'Curto entre fases, queima por sobreaquecimento, vibração',
+                sensor: 'Sensor de temperatura PT100 e Análise de Corrente (MCSA)'
+            },
+            {
+                id: 'rotor',
+                name: 'Rotor de Gaiola de Esquilo & Eixo',
+                icon: 'disc',
+                explodeOffset: { x: 0, y: 0, z: -2.2 },
+                desc: 'Conjunto girante fundido em alumínio com barras em curto-circuito e eixo em aço escovado usinado.',
+                func: 'Conversão da energia magnética em torque mecânico',
+                fault: 'Barras do rotor partidas, desbalanceamento dinâmico',
+                sensor: 'Análise de vibração espectral (1X RPM)'
+            },
+            {
+                id: 'bearing_front',
+                name: 'Rolamento Dianteiro (Esferas)',
+                icon: 'circle-dot',
+                explodeOffset: { x: 0, y: 0, z: -3.6 },
+                desc: 'Rolamento de alta precisão no lado do acoplamento (DE) sujeito às maiores cargas mecânicas.',
+                func: 'Suporte de carga radial/axial do acoplamento',
+                fault: 'Desgaste prematuro por folga inadequada ou desalinhamento',
+                sensor: 'Sensor contínuo de temperatura e vibração triaxial'
+            },
+            {
+                id: 'cover_front',
+                name: 'Tampa Dianteira Flangeada',
+                icon: 'shield',
+                explodeOffset: { x: 0, y: 0, z: -4.8 },
+                desc: 'Tampa dianteira em ferro fundido com usinagem de precisão e furos de fixação para acoplamento.',
+                func: 'Fechamento do lado da carga e guiamento do mancal dianteiro',
+                fault: 'Ovalização do alojamento, folga no retentor de vedação',
+                sensor: 'Monitoramento de temperatura no mancal'
+            },
+            {
+                id: 'terminal_box',
+                name: 'Caixa de Ligações / Bornes',
+                icon: 'zap',
+                explodeOffset: { x: 2.2, y: 1.8, z: 0 },
+                desc: 'Caixa selada contendo a placa de bornes cerâmica para conexões elétricas (Estrela/Triângulo).',
+                func: 'Conexão segura da alimentação elétrica trifásica',
+                fault: 'Mau contato elétrico, oxidação, sobreaquecimento por aperto inadequado',
+                sensor: 'Termografia Infravermelha contínua'
+            }
+        ];
+
+        // --- THREE.JS ENGINE SETUP ---
+        let scene, camera, renderer, controls;
+        let motorGroup;
+        const partMeshes = {};
+        const annotationElements = [];
+        let isExploded = false;
+        let showLabels = true;
+
+        const container = document.getElementById('canvas-container');
+        const annotationsContainer = document.getElementById('annotations-container');
+
+        function initThree() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0d1117, 0.025);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(8, 5, 10);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            container.appendChild(renderer.domElement);
+
+            // OrbitControls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 25;
+            controls.minDistance = 2;
+            controls.target.set(0, 0, 0);
+
+            // Studio Lighting Setup
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight1 = new THREE.DirectionalLight(0x00e5ff, 1.4);
+            dirLight1.position.set(6, 10, 6);
+            dirLight1.castShadow = true;
+            dirLight1.shadow.mapSize.width = 2048;
+            dirLight1.shadow.mapSize.height = 2048;
+            scene.add(dirLight1);
+
+            const dirLight2 = new THREE.DirectionalLight(0xffb703, 0.9);
+            dirLight2.position.set(-6, -2, -6);
+            scene.add(dirLight2);
+
+            const rimLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            rimLight.position.set(0, 5, -10);
+            scene.add(rimLight);
+
+            // Grid Floor
+            const gridHelper = new THREE.GridHelper(24, 24, 0x00e5ff, 0x1e293b);
+            gridHelper.position.y = -2.2;
+            scene.add(gridHelper);
+
+            // Build High-Detail Motor Geometry
+            createProceduralMotor();
+
+            // Setup HTML Annotations
+            createAnnotations();
+
+            // Raycasting for object selection
+            setupRaycaster();
+
+            // Resize listener
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // --- DETAILED PROCEDURAL 3D MOTOR GENERATION ---
+        function createProceduralMotor() {
+            motorGroup = new THREE.Group();
+            scene.add(motorGroup);
+
+            // High Quality PBR Materials
+            const bluePaintMat = new THREE.MeshStandardMaterial({ color: 0x1e40af, roughness: 0.35, metalness: 0.4 });
+            const darkCastMat = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.6, metalness: 0.7 });
+            const steelShaftMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.2, metalness: 0.95 });
+            const shinyChromeMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.1, metalness: 0.98 });
+            const copperMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.25, metalness: 0.8 });
+            const blackPlasticMat = new THREE.MeshStandardMaterial({ color: 0x09090b, roughness: 0.5 });
+
+            // Helper function to build detailed bearing mesh
+            function createDetailedBearing() {
+                const bGroup = new THREE.Group();
+                // Outer race
+                const outerGeo = new THREE.TorusGeometry(0.55, 0.08, 16, 32);
+                const outerMesh = new THREE.Mesh(outerGeo, shinyChromeMat);
+                bGroup.add(outerMesh);
+
+                // Inner race
+                const innerGeo = new THREE.TorusGeometry(0.35, 0.06, 16, 32);
+                const innerMesh = new THREE.Mesh(innerGeo, shinyChromeMat);
+                bGroup.add(innerMesh);
+
+                // Balls inside bearing
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const ballGeo = new THREE.SphereGeometry(0.07, 16, 16);
+                    const ball = new THREE.Mesh(ballGeo, shinyChromeMat);
+                    ball.position.set(Math.cos(angle) * 0.45, Math.sin(angle) * 0.45, 0);
+                    bGroup.add(ball);
+                }
+                return bGroup;
+            }
+
+            // 1. CARCAÇA ALETADA E ESTATOR
+            const casingGroup = new THREE.Group();
+            const bodyGeo = new THREE.CylinderGeometry(1.3, 1.3, 2.4, 32);
+            const bodyMesh = new THREE.Mesh(bodyGeo, bluePaintMat);
+            bodyMesh.rotation.x = Math.PI / 2;
+            bodyMesh.castShadow = true;
+            casingGroup.add(bodyMesh);
+
+            // Ribbed Cooling Fins (Aletas)
+            for (let i = 0; i < 16; i++) {
+                const angle = (i / 16) * Math.PI * 2;
+                const finGeo = new THREE.BoxGeometry(0.12, 0.22, 2.3);
+                const fin = new THREE.Mesh(finGeo, bluePaintMat);
+                fin.position.set(Math.cos(angle) * 1.35, Math.sin(angle) * 1.35, 0);
+                fin.rotation.z = angle;
+                casingGroup.add(fin);
+            }
+
+            // Base Feet (Pés de Fixação)
+            const footGeo = new THREE.BoxGeometry(2.8, 0.22, 1.8);
+            const foot = new THREE.Mesh(footGeo, bluePaintMat);
+            foot.position.set(0, -1.4, 0);
+            casingGroup.add(foot);
+
+            // Stator Coils inside (Cobre visível nas bordas)
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                const coilGeo = new THREE.BoxGeometry(0.12, 0.12, 2.45);
+                const coil = new THREE.Mesh(coilGeo, copperMat);
+                coil.position.set(Math.cos(angle) * 1.05, Math.sin(angle) * 1.05, 0);
+                casingGroup.add(coil);
+            }
+
+            partMeshes['casing'] = casingGroup;
+            motorGroup.add(casingGroup);
+
+            // 2. TAMPA DIANTEIRA (FLANGE / TAMPA DE ENTRADA)
+            const coverFrontGroup = new THREE.Group();
+            const coverFrontGeo = new THREE.CylinderGeometry(1.32, 1.32, 0.35, 32);
+            const coverFront = new THREE.Mesh(coverFrontGeo, bluePaintMat);
+            coverFront.rotation.x = Math.PI / 2;
+            coverFrontGroup.add(coverFront);
+
+            // Flange bolt holes
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const boltGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.4, 12);
+                const bolt = new THREE.Mesh(boltGeo, shinyChromeMat);
+                bolt.rotation.x = Math.PI / 2;
+                bolt.position.set(Math.cos(angle) * 1.1, Math.sin(angle) * 1.1, 0);
+                coverFrontGroup.add(bolt);
+            }
+            coverFrontGroup.position.set(0, 0, -1.35);
+            partMeshes['cover_front'] = coverFrontGroup;
+            motorGroup.add(coverFrontGroup);
+
+            // 3. ROLAMENTO DIANTEIRO
+            const bearingFront = createDetailedBearing();
+            bearingFront.position.set(0, 0, -1.1);
+            partMeshes['bearing_front'] = bearingFront;
+            motorGroup.add(bearingFront);
+
+            // 4. ROTOR DE GAIOLA DE ESQUILO & EIXO
+            const rotorGroup = new THREE.Group();
+            // Main Shaft
+            const shaftGeo = new THREE.CylinderGeometry(0.32, 0.32, 5.2, 32);
+            const shaft = new THREE.Mesh(shaftGeo, steelShaftMat);
+            shaft.rotation.x = Math.PI / 2;
+            rotorGroup.add(shaft);
+
+            // Rotor Laminated Core
+            const rotorCoreGeo = new THREE.CylinderGeometry(0.92, 0.92, 1.9, 32);
+            const rotorCore = new THREE.Mesh(rotorCoreGeo, darkCastMat);
+            rotorCore.rotation.x = Math.PI / 2;
+            rotorGroup.add(rotorCore);
+
+            // Aluminum Bars (Gaiola)
+            for (let i = 0; i < 14; i++) {
+                const angle = (i / 14) * Math.PI * 2;
+                const barGeo = new THREE.BoxGeometry(0.06, 0.06, 1.95);
+                const bar = new THREE.Mesh(barGeo, shinyChromeMat);
+                bar.position.set(Math.cos(angle) * 0.9, Math.sin(angle) * 0.9, 0);
+                rotorGroup.add(bar);
+            }
+
+            partMeshes['rotor'] = rotorGroup;
+            motorGroup.add(rotorGroup);
+
+            // 5. ROLAMENTO TRASEIRO
+            const bearingRear = createDetailedBearing();
+            bearingRear.position.set(0, 0, 1.1);
+            partMeshes['bearing_rear'] = bearingRear;
+            motorGroup.add(bearingRear);
+
+            // 6. TAMPA TRASEIRA (ESCUDO NDE)
+            const coverRearGroup = new THREE.Group();
+            const coverRearGeo = new THREE.CylinderGeometry(1.32, 1.32, 0.35, 32);
+            const coverRear = new THREE.Mesh(coverRearGeo, bluePaintMat);
+            coverRear.rotation.x = Math.PI / 2;
+            coverRearGroup.add(coverRear);
+            coverRearGroup.position.set(0, 0, 1.35);
+
+            partMeshes['cover_rear'] = coverRearGroup;
+            motorGroup.add(coverRearGroup);
+
+            // 7. VENTOINHA DE REFRIGERAÇÃO
+            const fanGroup = new THREE.Group();
+            const fanHubGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.35, 16);
+            const fanHub = new THREE.Mesh(fanHubGeo, blackPlasticMat);
+            fanHub.rotation.x = Math.PI / 2;
+            fanGroup.add(fanHub);
+
+            for (let i = 0; i < 8; i++) {
+                const bladeGeo = new THREE.BoxGeometry(0.65, 0.06, 0.3);
+                const blade = new THREE.Mesh(bladeGeo, blackPlasticMat);
+                const angle = (i / 8) * Math.PI * 2;
+                blade.position.set(Math.cos(angle) * 0.55, Math.sin(angle) * 0.55, 0);
+                blade.rotation.z = angle + 0.35;
+                fanGroup.add(blade);
+            }
+            fanGroup.position.set(0, 0, 1.85);
+            partMeshes['fan'] = fanGroup;
+            motorGroup.add(fanGroup);
+
+            // 8. CAPA DEFLETORA DA VENTOINHA
+            const coverFanGroup = new THREE.Group();
+            const fanCapGeo = new THREE.CylinderGeometry(1.35, 1.35, 0.85, 32, 1, true);
+            const fanCap = new THREE.Mesh(fanCapGeo, darkCastMat);
+            fanCap.rotation.x = Math.PI / 2;
+            coverFanGroup.add(fanCap);
+
+            const rearGrillGeo = new THREE.CircleGeometry(1.35, 32);
+            const rearGrill = new THREE.Mesh(rearGrillGeo, darkCastMat);
+            rearGrill.position.set(0, 0, 0.42);
+            coverFanGroup.add(rearGrill);
+
+            coverFanGroup.position.set(0, 0, 2.25);
+            partMeshes['fan_cover'] = coverFanGroup;
+            motorGroup.add(coverFanGroup);
+
+            // 9. CAIXA DE LIGAÇÕES / BORNES
+            const boxGroup = new THREE.Group();
+            const boxGeo = new THREE.BoxGeometry(0.9, 0.65, 0.9);
+            const box = new THREE.Mesh(boxGeo, bluePaintMat);
+            box.position.set(1.0, 1.15, 0);
+            boxGroup.add(box);
+
+            const capGeo = new THREE.BoxGeometry(0.95, 0.12, 0.95);
+            const cap = new THREE.Mesh(capGeo, blackPlasticMat);
+            cap.position.set(1.0, 1.52, 0);
+            boxGroup.add(cap);
+
+            partMeshes['terminal_box'] = boxGroup;
+            motorGroup.add(boxGroup);
+
+            // Save default target positions for smooth interpolation
+            MOTOR_PARTS.forEach(part => {
+                const mesh = partMeshes[part.id];
+                if (mesh) {
+                    mesh.userData = {
+                        id: part.id,
+                        originalPos: mesh.position.clone(),
+                        targetPos: mesh.position.clone()
+                    };
+                }
+            });
+        }
+
+        // --- ANNOTATIONS SYSTEM ---
+        function createAnnotations() {
+            annotationsContainer.innerHTML = '';
+            annotationElements.length = 0;
+
+            MOTOR_PARTS.forEach(part => {
+                const elem = document.createElement('div');
+                elem.className = 'annotation-label glass-panel px-3 py-1.5 rounded-xl border border-cyan-500/40 text-xs font-tech flex items-center space-x-2 shadow-lg';
+                elem.innerHTML = `
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                    <span class="text-white font-semibold">${part.name}</span>
+                `;
+
+                elem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openInfoPanel(part);
+                });
+
+                annotationsContainer.appendChild(elem);
+                annotationElements.push({ element: elem, partId: part.id });
+            });
+        }
+
+        function updateAnnotations() {
+            if (!showLabels || !isExploded) {
+                annotationElements.forEach(item => item.element.classList.remove('visible'));
+                return;
+            }
+
+            const tempV = new THREE.Vector3();
+            MOTOR_PARTS.forEach(part => {
+                const mesh = partMeshes[part.id];
+                const item = annotationElements.find(a => a.partId === part.id);
+
+                if (mesh && item) {
+                    mesh.getWorldPosition(tempV);
+                    // Slight upward offset for label placement
+                    tempV.y += 0.6;
+
+                    // Project 3D vector to 2D Screen
+                    tempV.project(camera);
+
+                    // Check if behind camera
+                    if (tempV.z > 1) {
+                        item.element.classList.remove('visible');
+                        return;
+                    }
+
+                    const x = (tempV.x * .5 + .5) * window.innerWidth;
+                    const y = (tempV.y * -.5 + .5) * window.innerHeight;
+
+                    item.element.style.left = `${x}px`;
+                    item.element.style.top = `${y}px`;
+                    item.element.classList.add('visible');
+                }
+            });
+        }
+
+        // --- ANIMATION CONTROLLER (EXPLODE) ---
+        function setExplodeState(explode) {
+            isExploded = explode;
+
+            MOTOR_PARTS.forEach(part => {
+                const mesh = partMeshes[part.id];
+                if (mesh) {
+                    if (isExploded) {
+                        const offset = part.explodeOffset;
+                        mesh.userData.targetPos = new THREE.Vector3(
+                            mesh.userData.originalPos.x + offset.x,
+                            mesh.userData.originalPos.y + offset.y,
+                            mesh.userData.originalPos.z + offset.z
+                        );
+                    } else {
+                        mesh.userData.targetPos = mesh.userData.originalPos.clone();
+                    }
+                }
+            });
+
+            // UI Buttons Update
+            const btnText = document.getElementById('btn-text');
+            const btnIcon = document.getElementById('btn-icon');
+            const btnExplode = document.getElementById('btn-explode');
+
+            if (isExploded) {
+                btnText.textContent = "MONTAR MOTOR";
+                btnIcon.setAttribute('data-lucide', 'rotate-ccw');
+                btnExplode.classList.remove('from-cyan-500', 'to-blue-600');
+                btnExplode.classList.add('from-amber-500', 'to-orange-600', 'glow-amber');
+            } else {
+                btnText.textContent = "EXPLODIR MOTOR (PLAY)";
+                btnIcon.setAttribute('data-lucide', 'play');
+                btnExplode.classList.remove('from-amber-500', 'to-orange-600', 'glow-amber');
+                btnExplode.classList.add('from-cyan-500', 'to-blue-600');
+                closeInfoPanel();
+            }
+            lucide.createIcons();
+        }
+
+        // --- RAYCASTING (CLICK 3D PARTS) ---
+        function setupRaycaster() {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            window.addEventListener('pointerdown', (e) => {
+                // Ignore clicks on UI
+                if (e.target.closest('.pointer-events-auto')) return;
+
+                mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(motorGroup.children, true);
+
+                if (intersects.length > 0) {
+                    let clickedObj = intersects[0].object;
+                    while (clickedObj.parent && clickedObj.parent !== motorGroup) {
+                        clickedObj = clickedObj.parent;
+                    }
+                    const partId = clickedObj.userData.id;
+                    const partData = MOTOR_PARTS.find(p => p.id === partId);
+                    if (partData) {
+                        openInfoPanel(partData);
+                    }
+                }
+            });
+        }
+
+        // --- INFO PANEL UI ---
+        function openInfoPanel(part) {
+            const panel = document.getElementById('info-card');
+            document.getElementById('info-title').textContent = part.name;
+            document.getElementById('info-desc').textContent = part.desc;
+            document.getElementById('info-function').textContent = part.func;
+            document.getElementById('info-fault').textContent = part.fault;
+            document.getElementById('info-sensor').textContent = part.sensor;
+
+            const iconElem = document.getElementById('info-icon');
+            iconElem.setAttribute('data-lucide', part.icon || 'cpu');
+            lucide.createIcons();
+
+            panel.classList.remove('opacity-0', 'translate-x-10', 'pointer-events-none');
+            panel.classList.add('opacity-100', 'translate-x-0');
+        }
+
+        function closeInfoPanel() {
+            const panel = document.getElementById('info-card');
+            panel.classList.add('opacity-0', 'translate-x-10', 'pointer-events-none');
+            panel.classList.remove('opacity-100', 'translate-x-0');
+        }
+
+        // --- RENDER LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Smooth Interpolation (Lerp) for exploding parts
+            MOTOR_PARTS.forEach(part => {
+                const mesh = partMeshes[part.id];
+                if (mesh && mesh.userData.targetPos) {
+                    mesh.position.lerp(mesh.userData.targetPos, 0.08);
+                }
+            });
+
+            // Gentle continuous rotation when assembled
+            if (!isExploded) {
+                motorGroup.rotation.y += 0.003;
+            } else {
+                motorGroup.rotation.y = THREE.MathUtils.lerp(motorGroup.rotation.y, 0, 0.05);
+            }
+
+            // Fan rotation simulation
+            if (partMeshes['fan']) {
+                partMeshes['fan'].rotation.z += 0.05;
+            }
+
+            controls.update();
+            updateAnnotations();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- EVENT LISTENERS ---
+        window.onload = () => {
+            initThree();
+            animate();
+            lucide.createIcons();
+
+            // Explode Button
+            document.getElementById('btn-explode').addEventListener('click', () => {
+                setExplodeState(!isExploded);
+            });
+
+            // Close Info Panel
+            document.getElementById('close-info').addEventListener('click', closeInfoPanel);
+
+            // Reset Camera
+            document.getElementById('btn-reset').addEventListener('click', () => {
+                camera.position.set(6, 4, 8);
+                controls.target.set(0, 0, 0);
+            });
+
+            // Toggle Labels
+            document.getElementById('btn-toggle-labels').addEventListener('click', () => {
+                showLabels = !showLabels;
+                updateAnnotations();
+            });
+        };
+    </script>
+</body>
+</html>
